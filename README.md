@@ -100,3 +100,52 @@ cell.imageView.layer.cornerRadius = 3
 cell.layer.cornerRadius = 7
 ```
 
+### NSCoding
+
+NSCoding is a protocol that enables an object to be encoded and decoded for archiving and distribution.  Encoding means to serialize the data on your app into an architecture-independent suitable for storage in a file or sending it over the network.  Inversely, decoding means deserializing the data received from the disk or the network into a format that you can use within your app.  Once an object is encoded, it’s able to be archived, which means for the object or other structures to be stored on disk.  It could also be distributed, which means the object is copied to different address spaces.  
+
+In order for a class to conform to NSCoding, the class has to conform to NSObject first.  This is because NSCoding requires you to use objects or structs that are interchangeable with objects.  This means any class always has to conform to both NSObject and NSCoding in order to encode or decode a class using NSCoding.
+
+Once you’ve got both NSObject as well as NSCoding, you now have to have some methods to fully conform to NSCoding. 
+
+```
+required init(coder aDecoder: NSCoder) {
+    name = aDecoder.decodeObject(forKey: "name") as? String ?? ""
+    image = aDecoder.decodeObject(forKey: "image") as? String ?? ""
+}
+
+func encode(with aCoder: NSCoder) {
+    aCoder.encode(name, forKey: "name")
+    aCoder.encode(image, forKey: "image")
+}
+```
+
+When encoding the “NSKeyedArchiver”, which is a subclass of NSCoder, calls the encode function of of the class you want to encode and  converts whatever the current form is into the Data object. This is, then, given to UserDefaults to be written to disk:
+
+```
+if let savedData = try? NSKeyedArchiver.archivedData(withRootObject: people, requiringSecureCoding: false) {
+    let defaults = UserDefaults.standard
+    defaults.set(savedData, forKey: "people")
+}
+```
+
+In a similar manner, but in a reverse order, the NSKeyedUnarchiver, which is also a subclass of NSCoder, invokes the “required init(coder aDecoder: NSCoder)” method in the class you want to decode.  We are downcasting String in the “required init(coder aDecoder: NSCoder)” method shown above because “decodeObject()” returns the Any type, but the “name” and “image” variables are of the String type.  We’re also using nil coalescing because the same method returns an optional.  Nil coalescing unwraps the optional for us to use. 
+
+```
+let defaults = UserDefaults.standard
+
+if let savedPeople = defaults.object(forKey: "people") as? Data {
+    if let decodedPeople = try? NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(savedPeople) as? [Person] {
+        people = decodedPeople
+    }
+}
+```
+To sum up:
+
+- For encoding:
+
+NSKeyedArchiver.archivedData -> encode(with aCoder: NSCoder) -> UserDefaults
+
+- For decoding:
+
+ UserDefaults -> NSKeyedUnarchiver.unarchiveTopLevelObjectWithData -> required init(coder aDecoder: NSCoder)
