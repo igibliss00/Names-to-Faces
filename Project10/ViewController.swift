@@ -6,23 +6,50 @@
 //  Copyright © 2020 J. All rights reserved.
 //
 
+import LocalAuthentication
 import UIKit
 
 class ViewController: UICollectionViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     var people = [Person]()
+    var isAuthenticated = false
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addNewPerson))
-        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .camera, target: self, action: #selector(addFromCamera))
+        let addButton = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addNewPerson))
+        let cameraButton = UIBarButtonItem(barButtonSystemItem: .camera, target: self, action: #selector(addFromCamera))
+        navigationItem.leftBarButtonItems = [addButton, cameraButton]
         
-        let defaults = UserDefaults.standard
-        if let savedPeople = defaults.object(forKey: "people") as? Data {
-            if let decodedPeople = try? NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(savedPeople) as? [Person] {
-                people = decodedPeople
+        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(logout))
+        
+        if isAuthenticated {
+            loadPeople()
+        } else {
+            let context = LAContext()
+            var error: NSError?
+            
+            if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+                let reason = "Identify yourself"
+                
+                context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { [weak self](success, authError) in
+                    DispatchQueue.main.async {
+                        if success {
+                            self?.isAuthenticated = true
+                            self?.loadPeople()
+                        } else {
+                            let authFailedController = UIAlertController(title: "Authentication failed", message: nil, preferredStyle: .alert)
+                            authFailedController.addAction(UIAlertAction(title: "OK", style: .cancel, handler: nil))
+                            self?.present(authFailedController, animated: true)
+                        }
+                    }
+                }
+            } else {
+                let ac = UIAlertController(title: "No biometry available", message: nil, preferredStyle: .alert)
+                ac.addAction((UIAlertAction(title: "OK", style: .cancel, handler: nil)))
+                present(ac, animated: true)
             }
         }
+        
         
 //        if let savedPeople = defaults.object(forKey: "people") as? Data {
 //            let jsonDecoder = JSONDecoder()
@@ -34,7 +61,7 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
 //            }
 //        }
     }
-
+    
     override func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return people.count
     }
@@ -99,6 +126,11 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
         }
     }
     
+    @objc func logout() {
+        isAuthenticated = false
+        collectionView.reloadData()
+    }
+    
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         guard let image = info[.editedImage] as? UIImage else { return }
         
@@ -134,9 +166,15 @@ class ViewController: UICollectionViewController, UIImagePickerControllerDelegat
 //        } else {
 //            print("Failed to save people")
 //        }
-        
+    }
+    
+    func loadPeople() {
+        let defaults = UserDefaults.standard
+        if let savedPeople = defaults.object(forKey: "people") as? Data {
+            if let decodedPeople = try? NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(savedPeople) as? [Person] {
+                people = decodedPeople
+                collectionView.reloadData()
+            }
+        }
     }
 }
-
-
-
